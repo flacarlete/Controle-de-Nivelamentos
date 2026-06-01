@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Controle de Contraturno — Arena</title>
+<!-- v2.1 nivelamento-unificado -->
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -636,75 +637,218 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
   <nav class="tab-nav" id="tab-nav"></nav>
 
   <div class="container">
-    <!-- Chamada -->
+    <!-- Nivelamento (unificado) -->
     <div class="tab-pane active" id="pane-chamada">
-      <div class="stats-grid" id="stats-grid"></div>
-      <div class="disc-pills" id="disc-pills"></div>
-      <div class="disc-pills" id="serie-pills" style="display:none"></div>
-      <div class="card">
-        <div class="card-hdr">
-          <div>
-            <div class="card-title" id="chamada-disc-title">Selecione uma disciplina</div>
-            <div class="card-sub" id="chamada-disc-sub">—</div>
+
+      <!-- Sub-tabs internos do Nivelamento -->
+      <div class="at-sub-tabs" style="margin-bottom:1.25rem">
+        <button class="at-sub-tab active" id="nvst-chamada"   onclick="nvSubTab('chamada')">📋 Chamada</button>
+        <button class="at-sub-tab"        id="nvst-historico" onclick="nvSubTab('historico')">📅 Histórico</button>
+        <button class="at-sub-tab"        id="nvst-alertas"   onclick="nvSubTab('alertas')">🔔 Alertas</button>
+        <button class="at-sub-tab"        id="nvst-frequencia" onclick="nvSubTab('frequencia')">📊 Frequência</button>
+        <button class="at-sub-tab"        id="nvst-alunos"    onclick="nvSubTab('alunos')">👥 Alunos</button>
+        <button class="at-sub-tab"        id="nvst-relatorios" onclick="nvSubTab('relatorios')">📄 Relatórios</button>
+      </div>
+
+      <!-- CHAMADA -->
+      <div class="at-sub-pane active" id="nvpane-chamada">
+        <div class="stats-grid" id="stats-grid"></div>
+        <div class="disc-pills" id="disc-pills"></div>
+        <div class="disc-pills" id="serie-pills" style="display:none"></div>
+        <div class="card">
+          <div class="card-hdr">
+            <div>
+              <div class="card-title" id="chamada-disc-title">Selecione uma disciplina</div>
+              <div class="card-sub" id="chamada-disc-sub">—</div>
+            </div>
+            <div class="btn-group">
+              <button class="btn" style="background:transparent;border-color:transparent;color:var(--text3)" onclick="marcarTodos('P')">✓ Todos presentes</button>
+              <button class="btn" style="background:transparent;border-color:transparent;color:var(--text3)" onclick="marcarTodos('F')">✕ Todos faltaram</button>
+            </div>
           </div>
-          <div class="btn-group">
-            <button class="btn" style="background:transparent;border-color:transparent;color:var(--text3)" onclick="marcarTodos('P')">✓ Todos presentes</button>
-            <button class="btn" style="background:transparent;border-color:transparent;color:var(--text3)" onclick="marcarTodos('F')">✕ Todos faltaram</button>
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="progress-wrap" id="progress-wrap" style="display:none">
-            <div class="progress-label"><span id="prog-label">0 presentes</span><span id="prog-pct">0%</span></div>
-            <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%;background:var(--accent-mid)"></div></div>
-          </div>
-          <div class="aluno-list" id="aluno-list">
-            <div class="empty"><span class="e-ico">📌</span><p>Selecione uma disciplina acima para iniciar a chamada</p></div>
+          <div class="card-body">
+            <div class="progress-wrap" id="progress-wrap" style="display:none">
+              <div class="progress-label"><span id="prog-label">0 presentes</span><span id="prog-pct">0%</span></div>
+              <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%;background:var(--accent-mid)"></div></div>
+            </div>
+            <div class="aluno-list" id="aluno-list">
+              <div class="empty"><span class="e-ico">📌</span><p>Selecione uma disciplina acima para iniciar a chamada</p></div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- Histórico -->
-    <div class="tab-pane" id="pane-historico">
-      <div id="history-list"></div>
-    </div>
-
-    <!-- Alertas -->
-    <div class="tab-pane" id="pane-alertas">
-      <div class="card" style="margin-bottom:14px">
-        <div class="card-hdr">
-          <div><div class="card-title">🔔 Alertas de faltas</div><div class="card-sub">Alunos com 2 ou mais faltas — notificação pronta para WhatsApp</div></div>
-          <div class="filters" id="alerta-filters"></div>
-        </div>
+      <!-- HISTÓRICO -->
+      <div class="at-sub-pane" id="nvpane-historico">
+        <div id="history-list"></div>
       </div>
-      <div id="alertas-list"></div>
-    </div>
 
-    <!-- Relatório Nivelamento -->
-    <div class="tab-pane" id="pane-relatorio">
-      <div class="card" style="margin-bottom:14px">
-        <div class="card-hdr">
-          <div><div class="card-title">📊 Frequência por aluno</div><div class="card-sub">Histórico completo de presença e faltas</div></div>
-        </div>
-        <div class="card-body" style="padding-bottom:8px">
-          <div class="filters" id="relatorio-filters"></div>
-        </div>
-      </div>
-      <div id="relatorio-list"></div>
-    </div>
-
-    <!-- Gerenciar alunos -->
-    <div class="tab-pane" id="pane-gerenciar">
-      <div class="card">
-        <div class="card-hdr"><div class="card-title">⚙️ Gerenciar alunos e disciplinas</div></div>
-        <div class="card-body">
-          <div class="btn-group" style="margin-bottom:16px">
-            <button class="btn btn-green" onclick="openModalAluno()">+ Adicionar aluno</button>
-            <button class="btn" onclick="openModalDisc()">+ Nova disciplina</button>
+      <!-- ALERTAS -->
+      <div class="at-sub-pane" id="nvpane-alertas">
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-hdr">
+            <div><div class="card-title">🔔 Alertas de faltas</div><div class="card-sub">Alunos com 2 ou mais faltas — notificação pronta para WhatsApp</div></div>
+            <div class="filters" id="alerta-filters"></div>
           </div>
-          <div id="gerenciar-list"></div>
+        </div>
+        <div id="alertas-list"></div>
+      </div>
+
+      <!-- FREQUÊNCIA -->
+      <div class="at-sub-pane" id="nvpane-frequencia">
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-hdr">
+            <div><div class="card-title">📊 Frequência por aluno</div><div class="card-sub">Histórico completo de presença e faltas</div></div>
+          </div>
+          <div class="card-body" style="padding-bottom:8px">
+            <div class="filters" id="relatorio-filters"></div>
+          </div>
+        </div>
+        <div id="relatorio-list"></div>
+      </div>
+
+      <!-- ALUNOS -->
+      <div class="at-sub-pane" id="nvpane-alunos">
+        <div class="card">
+          <div class="card-hdr"><div class="card-title">👥 Gerenciar alunos e disciplinas</div></div>
+          <div class="card-body">
+            <div class="btn-group" style="margin-bottom:16px">
+              <button class="btn btn-green" onclick="openModalAluno()">+ Adicionar aluno</button>
+              <button class="btn" onclick="openModalDisc()">+ Nova disciplina</button>
+            </div>
+            <div id="gerenciar-list"></div>
+          </div>
         </div>
       </div>
+
+      <!-- RELATÓRIOS -->
+      <div class="at-sub-pane" id="nvpane-relatorios">
+        <div class="rel-page">
+
+        <!-- Config EmailJS -->
+        <div class="rel-config-card" id="emailjs-config-card">
+          <div class="rel-config-hdr">
+            <div>
+              <div class="rel-config-hdr-title">✉️ Configuração de E-mail (EmailJS)</div>
+            </div>
+            <span class="rel-config-status" id="emailjs-status-badge">⚠ Não configurado</span>
+          </div>
+          <div class="rel-config-body">
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Service ID</label>
+              <input class="form-input" id="ejs-service" placeholder="Ex: service_abc123">
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Template ID</label>
+              <input class="form-input" id="ejs-template" placeholder="Ex: template_xyz456">
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Public Key</label>
+              <input class="form-input" id="ejs-pubkey" placeholder="Ex: user_ABCDEFGHIJ">
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label">E-mail padrão (destino)</label>
+              <input class="form-input" id="ejs-email" type="email" placeholder="Ex: coordenacao@arena.edu.br">
+            </div>
+          </div>
+          <div style="padding:0 16px 16px;display:flex;gap:8px;align-items:center">
+            <button class="btn btn-green" onclick="salvarEmailConfig()">💾 Salvar configuração</button>
+            <a href="https://www.emailjs.com" target="_blank" style="font-size:12px;color:var(--accent)">Como configurar o EmailJS →</a>
+          </div>
+        </div>
+
+        <!-- Relatórios disponíveis -->
+        <div class="rel-section-title">📋 Nivelamento — Frequência</div>
+        <div class="rel-cards">
+          <div class="rel-card">
+            <div class="rel-card-icon">📊</div>
+            <div class="rel-card-title">Frequência por disciplina</div>
+            <div class="rel-card-sub">Resumo de presença e faltas de todos os alunos, organizado por disciplina.</div>
+            <div class="rel-card-actions">
+              <button class="rel-btn-pdf" onclick="gerarPDF('frequencia_disc')">📄 Gerar PDF</button>
+              <button class="rel-btn-email" onclick="enviarEmail('frequencia_disc')">✉️ Enviar</button>
+            </div>
+          </div>
+          <div class="rel-card">
+            <div class="rel-card-icon">🔔</div>
+            <div class="rel-card-title">Alertas de faltas</div>
+            <div class="rel-card-sub">Lista de alunos com 2 ou mais faltas no nivelamento, com contagem por disciplina.</div>
+            <div class="rel-card-actions">
+              <button class="rel-btn-pdf" onclick="gerarPDF('alertas_faltas')">📄 Gerar PDF</button>
+              <button class="rel-btn-email" onclick="enviarEmail('alertas_faltas')">✉️ Enviar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="rel-section-title">⏰ Atrasos</div>
+        <div class="rel-cards">
+          <div class="rel-card">
+            <div class="rel-card-icon">📅</div>
+            <div class="rel-card-title">Atrasos de hoje</div>
+            <div class="rel-card-sub">Registro completo de atrasos do dia atual com horário, turma e justificativa.</div>
+            <div class="rel-card-actions">
+              <button class="rel-btn-pdf" onclick="gerarPDF('atrasos_hoje')">📄 Gerar PDF</button>
+              <button class="rel-btn-email" onclick="enviarEmail('atrasos_hoje')">✉️ Enviar</button>
+            </div>
+          </div>
+          <div class="rel-card">
+            <div class="rel-card-icon">⚠️</div>
+            <div class="rel-card-title">Alunos reincidentes</div>
+            <div class="rel-card-sub">Alunos com 2 ou mais atrasos registrados, com histórico de ocorrências.</div>
+            <div class="rel-card-actions">
+              <button class="rel-btn-pdf" onclick="gerarPDF('atrasos_reincid')">📄 Gerar PDF</button>
+              <button class="rel-btn-email" onclick="enviarEmail('atrasos_reincid')">✉️ Enviar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="rel-section-title">👨‍🏫 Professores</div>
+        <div class="rel-cards">
+          <div class="rel-card">
+            <div class="rel-card-icon">📋</div>
+            <div class="rel-card-title">Controle de professores — Hoje</div>
+            <div class="rel-card-sub">Resumo de todos os checks de professores do dia: chegada, chamada, banheiro e saída.</div>
+            <div class="rel-card-actions">
+              <button class="rel-btn-pdf" onclick="gerarPDF('prof_hoje')">📄 Gerar PDF</button>
+              <button class="rel-btn-email" onclick="enviarEmail('prof_hoje')">✉️ Enviar</button>
+            </div>
+          </div>
+          <div class="rel-card">
+            <div class="rel-card-icon">📊</div>
+            <div class="rel-card-title">Ocorrências de professores</div>
+            <div class="rel-card-sub">Histórico de problemas registrados por professor, com contagem por critério.</div>
+            <div class="rel-card-actions">
+              <button class="rel-btn-pdf" onclick="gerarPDF('prof_ocorrencias')">📄 Gerar PDF</button>
+              <button class="rel-btn-email" onclick="enviarEmail('prof_ocorrencias')">✉️ Enviar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="rel-section-title">📚 Sala de Estudos</div>
+        <div class="rel-cards">
+          <div class="rel-card">
+            <div class="rel-card-icon">📝</div>
+            <div class="rel-card-title">Relatórios de monitoria</div>
+            <div class="rel-card-sub">Todos os relatórios preenchidos da sala de estudos com indicadores e ocorrências.</div>
+            <div class="rel-card-actions">
+              <button class="rel-btn-pdf" onclick="gerarPDF('sala_estudos')">📄 Gerar PDF</button>
+              <button class="rel-btn-email" onclick="enviarEmail('sala_estudos')">✉️ Enviar</button>
+            </div>
+          </div>
+          <div class="rel-card">
+            <div class="rel-card-icon">🌟</div>
+            <div class="rel-card-title">Resumo geral</div>
+            <div class="rel-card-sub">Visão consolidada de frequência, atrasos e professores em um único relatório.</div>
+            <div class="rel-card-actions">
+              <button class="rel-btn-pdf" onclick="gerarPDF('resumo_geral')">📄 Gerar PDF</button>
+              <button class="rel-btn-email" onclick="enviarEmail('resumo_geral')">✉️ Enviar</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      </div>
+
     </div>
 
     <!-- Atrasos -->
@@ -1179,22 +1323,17 @@ const ROLE_COLORS  = {admin:'role-admin', coord:'role-coord', orient:'role-orien
 
 // Tabs disponíveis por perfil
 const TABS_BY_ROLE = {
-  admin:   ['chamada','historico','alertas','relatorio','gerenciar','atrasos','sala','professores','relatorios','admin'],
-  coord:   ['chamada','historico','alertas','relatorio','atrasos','sala','professores','relatorios'],
-  orient:  ['chamada','historico','alertas','atrasos'],
+  admin:   ['chamada','atrasos','sala','professores','admin'],
+  coord:   ['chamada','atrasos','sala','professores'],
+  orient:  ['chamada','atrasos'],
   monitor: ['sala'],
 };
 
 const TAB_DEFS = [
-  {id:'chamada',     icon:'📋', label:'Chamada'},
-  {id:'historico',   icon:'📅', label:'Histórico'},
-  {id:'alertas',     icon:'🔔', label:'Alertas'},
-  {id:'relatorio',   icon:'📊', label:'Frequência'},
-  {id:'gerenciar',   icon:'👥', label:'Alunos'},
+  {id:'chamada',     icon:'📋', label:'Nivelamento'},
   {id:'atrasos',     icon:'⏰', label:'Atrasos'},
   {id:'sala',        icon:'📚', label:'Sala de Estudos'},
   {id:'professores', icon:'👨‍🏫', label:'Professores'},
-  {id:'relatorios',  icon:'📄', label:'Relatórios'},
   {id:'admin',       icon:'⚙️', label:'Admin'},
 ];
 
@@ -4191,6 +4330,23 @@ async function confirmarEnvioEmail() {
     stat.innerHTML=`<div style="color:var(--red);font-size:12px">⚠️ Erro: ${e?.text||e?.message||JSON.stringify(e)}</div>`;
     btn.disabled=false; btn.textContent='✉️ Tentar novamente';
   }
+}
+
+
+// ── Sub-tabs do Nivelamento ───────────────────────────────
+function nvSubTab(tab) {
+  document.querySelectorAll('[id^="nvst-"]').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('[id^="nvpane-"]').forEach(p=>p.classList.remove('active'));
+  const btn  = document.getElementById('nvst-'+tab);
+  const pane = document.getElementById('nvpane-'+tab);
+  if(btn)  btn.classList.add('active');
+  if(pane) pane.classList.add('active');
+  if(tab==='historico')  renderHistory();
+  if(tab==='alertas')    renderAlertas();
+  if(tab==='frequencia') renderRelatorio();
+  if(tab==='alunos')     renderGerenciar();
+  if(tab==='chamada')    renderChamada();
+  if(tab==='relatorios') initRelatorios();
 }
 
 // ══ BOOT ════════════════════════════════════════════════
