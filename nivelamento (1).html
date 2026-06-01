@@ -540,31 +540,98 @@ const DADOS_INICIAIS = {
   frequencia: {}
 };
 
-function getData() {
-  try {
-    const raw = localStorage.getItem('nivel_v1');
-    if (!raw) {
-      // primeira vez: carrega dados iniciais
-      localStorage.setItem('nivel_v1', JSON.stringify(DADOS_INICIAIS));
-      return JSON.parse(JSON.stringify(DADOS_INICIAIS));
-    }
-    const d = JSON.parse(raw);
-    // garante que disciplinas e alunos existam
-    if (!d.disciplinas || d.disciplinas.length === 0) d.disciplinas = DADOS_INICIAIS.disciplinas;
-    if (!d.alunos || d.alunos.length === 0) d.alunos = DADOS_INICIAIS.alunos;
-    return d;
-  } catch(e) { return JSON.parse(JSON.stringify(DADOS_INICIAIS)); }
+// ═══════════════════════════════════════
+// SUPABASE — REST API direta (sem SDK)
+// ═══════════════════════════════════════
+const SUPA_URL = 'https://elimvidualutiifnolxy.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsaW12aWR1YWx1dGlpZm5vbHh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMjY2NzAsImV4cCI6MjA5NTkwMjY3MH0.90hMsFqCaP3ovXlwhxmpChHT6W6qF-xIVzyiokDlMbA';
+
+const SUPA_HEADERS = {
+  'apikey': SUPA_KEY,
+  'Authorization': 'Bearer ' + SUPA_KEY,
+  'Content-Type': 'application/json',
+  'Prefer': 'return=minimal'
+};
+
+async function supaGet(params = '') {
+  const res = await fetch(`${SUPA_URL}/rest/v1/frequencia?${params}`, {
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY }
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
 }
-function saveData(d) { try { localStorage.setItem('nivel_v1', JSON.stringify(d)); } catch(e) {} }
 
+async function supaUpsert(rows) {
+  const res = await fetch(`${SUPA_URL}/rest/v1/frequencia`, {
+    method: 'POST',
+    headers: { ...SUPA_HEADERS, 'Prefer': 'resolution=merge-duplicates' },
+    body: JSON.stringify(Array.isArray(rows) ? rows : [rows])
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
 
-function getDiscs()    { const d=getData(); return d.disciplinas||['Matemática','Português','Ciências']; }
-function getAlunos()   { const d=getData(); return d.alunos||[]; }
-function getFreq()     { const d=getData(); return d.frequencia||{}; }
+async function supaDelete(alunoId, data) {
+  const res = await fetch(
+    `${SUPA_URL}/rest/v1/frequencia?aluno_id=eq.${encodeURIComponent(alunoId)}&data=eq.${data}`,
+    { method: 'DELETE', headers: SUPA_HEADERS }
+  );
+  if (!res.ok) throw new Error(await res.text());
+}
 
-function saveDiscs(v)  { const d=getData(); d.disciplinas=v; saveData(d); }
-function saveAlunos(v) { const d=getData(); d.alunos=v; saveData(d); }
-function saveFreq(v)   { const d=getData(); d.frequencia=v; saveData(d); }
+async function supaDeleteDia(data) {
+  const res = await fetch(
+    `${SUPA_URL}/rest/v1/frequencia?data=eq.${data}`,
+    { method: 'DELETE', headers: SUPA_HEADERS }
+  );
+  if (!res.ok) throw new Error(await res.text());
+}
+
+// Cache local da frequência
+let _freqCache    = {}; // { aluno_id: "P"|"F" } — dia de hoje
+let _allFreqCache = {}; // { "YYYY-MM-DD": { aluno_id: status } } — histórico
+let _freqLoaded   = false;
+
+async function carregarFreqDia() {
+  try {
+    const data = await supaGet(`select=aluno_id,status&data=eq.${todayKey}`);
+    _freqCache = {};
+    data.forEach(r => { _freqCache[r.aluno_id] = r.status; });
+    _freqLoaded = true;
+  } catch(e) {
+    console.error('Erro ao carregar frequência do dia:', e.message);
+    showToast('⚠️ Erro ao carregar dados: ' + e.message, 6000);
+  }
+}
+
+async function carregarTodaFreq() {
+  try {
+    const data = await supaGet('select=aluno_id,data,status&order=data.asc');
+    _allFreqCache = {};
+    data.forEach(r => {
+      if (!_allFreqCache[r.data]) _allFreqCache[r.data] = {};
+      _allFreqCache[r.data][r.aluno_id] = r.status;
+    });
+    return _allFreqCache;
+  } catch(e) {
+    console.error('Erro ao carregar histórico:', e.message);
+    return {};
+  }
+}
+
+// ═══════════════════════════════════════
+// STORAGE (alunos/disciplinas em memória; frequência no Supabase)
+// ═══════════════════════════════════════
+function getData()   { return DADOS_INICIAIS; }
+function saveData(d) {}
+
+function getDiscs()    { return DADOS_INICIAIS.disciplinas; }
+function getAlunos()   { return DADOS_INICIAIS.alunos; }
+function getFreq()     { return { [todayKey]: _freqCache }; }
+
+function saveDiscs(v)  { DADOS_INICIAIS.disciplinas = v; }
+function saveAlunos(v) { DADOS_INICIAIS.alunos = v; }
+function saveFreq(v)   { /* substituído pelo Supabase */ }
+
 
 // ═══════════════════════════════════════
 // TEMPO
@@ -759,12 +826,19 @@ function renderAlunoList(){
   list.innerHTML = html;
 }
 
-function setFreq(alunoId, status){
-  const freq = getFreq();
-  if(!freq[todayKey]) freq[todayKey]={};
-  if(freq[todayKey][alunoId]===status) delete freq[todayKey][alunoId];
-  else freq[todayKey][alunoId]=status;
-  saveFreq(freq);
+async function setFreq(alunoId, status){
+  const current = _freqCache[alunoId];
+  if (current === status) {
+    delete _freqCache[alunoId];
+    if (!_allFreqCache[todayKey]) _allFreqCache[todayKey] = {};
+    delete _allFreqCache[todayKey][alunoId];
+    try { await supaDelete(alunoId, todayKey); } catch(e){ console.error(e.message); }
+  } else {
+    _freqCache[alunoId] = status;
+    if (!_allFreqCache[todayKey]) _allFreqCache[todayKey] = {};
+    _allFreqCache[todayKey][alunoId] = status;
+    try { await supaUpsert({ aluno_id: alunoId, data: todayKey, status }); } catch(e){ console.error(e.message); }
+  }
   renderAlunoList();
   renderStats();
   renderDiscPills();
@@ -790,17 +864,20 @@ function buildAlunoRow(a, dayFreq){
   </div>`;
 }
 
-function marcarTodos(status){
+async function marcarTodos(status){
   if(!activeDisc) return;
   let alunos = getAlunos().filter(a=>a.disc===activeDisc);
   if(activeSerie!=='__todos__'){
     const prefix = activeSerie.replace(' ANO','');
     alunos = alunos.filter(a=>a.turma.startsWith(prefix));
   }
-  const freq = getFreq();
-  if(!freq[todayKey]) freq[todayKey]={};
-  alunos.forEach(a=>{ freq[todayKey][a.id]=status; });
-  saveFreq(freq);
+  if(!_allFreqCache[todayKey]) _allFreqCache[todayKey] = {};
+  alunos.forEach(a => {
+    _freqCache[a.id] = status;
+    _allFreqCache[todayKey][a.id] = status;
+  });
+  const upserts = alunos.map(a => ({ aluno_id: a.id, data: todayKey, status }));
+  try { await supaUpsert(upserts); } catch(e){ console.error(e.message); }
   renderAlunoList();
   renderStats();
   renderDiscPills();
@@ -1103,22 +1180,37 @@ function initials(name){
   return name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0]?.toUpperCase()||'').join('');
 }
 function contarFaltas(id){
-  const freq=getFreq();
-  return Object.values(freq).filter(day=>day[id]==='F').length;
+  return Object.values(_allFreqCache).filter(day=>day[id]==='F').length;
 }
 function contarPresencas(id){
-  const freq=getFreq();
-  return Object.values(freq).filter(day=>day[id]==='P').length;
+  return Object.values(_allFreqCache).filter(day=>day[id]==='P').length;
 }
 function diasFalta(id){
-  const freq=getFreq();
-  return Object.keys(freq).filter(day=>freq[day][id]==='F').sort();
+  return Object.keys(_allFreqCache).filter(day=>_allFreqCache[day][id]==='F').sort();
 }
 
 // ═══════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════
-renderChamada();
+async function init(){
+  // Carrega frequência do Supabase antes de renderizar
+  showToast('⏳ Carregando dados...', 3000);
+  await carregarFreqDia();
+  await carregarTodaFreq();
+  _allFreqCache[todayKey] = _freqCache;
+  renderChamada();
+}
+init();
+
+function showToast(msg, duration=2500){
+  let t = document.getElementById('_toast');
+  if(!t){ t=document.createElement('div'); t.id='_toast';
+    t.style.cssText='position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1B4332;color:#fff;padding:10px 20px;border-radius:30px;font-size:13px;font-family:var(--font);z-index:999;box-shadow:0 4px 16px rgba(0,0,0,.2);transition:opacity .3s';
+    document.body.appendChild(t); }
+  t.textContent=msg; t.style.opacity='1';
+  clearTimeout(t._timer);
+  t._timer=setTimeout(()=>{ t.style.opacity='0'; },duration);
+}
 </script>
 </body>
 </html>
