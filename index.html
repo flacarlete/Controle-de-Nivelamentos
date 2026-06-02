@@ -2214,36 +2214,7 @@ function showToast(msg, duration=2500){
   clearTimeout(t._timer);
   t._timer=setTimeout(()=>{ t.style.opacity='0'; },duration);
 }
-</script>
 
-<!-- Modal envio de e-mail -->
-<div class="modal-overlay" id="modal-email">
-  <div class="modal">
-    <div class="modal-hdr">
-      <h3 id="modal-email-title">Enviar relatório por e-mail</h3>
-      <button class="modal-close" onclick="closeModal('modal-email')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label">Destinatário</label>
-        <input class="form-input" type="email" id="email-to" placeholder="email@arena.edu.br">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Assunto</label>
-        <input class="form-input" id="email-subject" placeholder="Ex: Relatório de Frequência — Arena">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Mensagem adicional (opcional)</label>
-        <textarea class="form-textarea" id="email-msg" rows="3" placeholder="Segue em anexo o relatório..."></textarea>
-      </div>
-      <div id="email-send-status"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('modal-email')">Cancelar</button>
-      <button class="btn btn-confirm" id="btn-send-email" onclick="confirmarEnvioEmail()">✉️ Enviar</button>
-    </div>
-  </div>
-</div>
 
 // Cache local da frequência
 let _freqCache    = {}; // { aluno_id: "P"|"F" } — dia de hoje
@@ -4372,6 +4343,7 @@ function nvSubTab(tab) {
   document.getElementById('login-screen').style.display='flex';
 })();
 </script>
+
 
 <!-- Modal envio de e-mail -->
 <div class="modal-overlay" id="modal-email">
