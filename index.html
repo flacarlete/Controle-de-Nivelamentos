@@ -1541,10 +1541,52 @@ const TAB_DEFS = [
   {id:'admin',       icon:'⚙️', label:'Admin'},
 ];
 
+// Cache local de usuários (carregado do Supabase no boot)
+let _usersCache = null;
+
 function getUsers() {
-  try { return JSON.parse(localStorage.getItem('arena_users') || 'null') || DEFAULT_USERS; } catch(e) { return DEFAULT_USERS; }
+  return _usersCache || DEFAULT_USERS;
 }
-function saveUsers(u) { try { localStorage.setItem('arena_users', JSON.stringify(u)); } catch(e) {} }
+
+async function saveUsers(users) {
+  _usersCache = users;
+  // Sincronizar com Supabase: upsert de todos os usuários
+  try {
+    await fetch(`${SUPA_URL}/rest/v1/usuarios`, {
+      method: 'POST',
+      headers: { ...SUPA_HEADERS, 'Prefer': 'resolution=merge-duplicates' },
+      body: JSON.stringify(users.map(u => ({
+        id: u.id, login: u.login, name: u.name,
+        role: u.role, pwd: u.pwd,
+        tabs: u.tabs ? JSON.stringify(u.tabs) : null
+      })))
+    });
+  } catch(e) { console.error('Erro ao salvar usuários:', e.message); }
+}
+
+async function loadUsersFromSupabase() {
+  try {
+    const res = await fetch(`${SUPA_URL}/rest/v1/usuarios?select=*&order=created_at.asc`, {
+      headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY }
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    if (data && data.length > 0) {
+      _usersCache = data.map(u => ({
+        id: u.id, login: u.login, name: u.name,
+        role: u.role, pwd: u.pwd,
+        tabs: u.tabs ? (typeof u.tabs === 'string' ? JSON.parse(u.tabs) : u.tabs) : null
+      }));
+    } else {
+      // Primeira vez: seed com DEFAULT_USERS
+      _usersCache = DEFAULT_USERS;
+      await saveUsers(DEFAULT_USERS);
+    }
+  } catch(e) {
+    console.error('Erro ao carregar usuários do Supabase:', e.message);
+    _usersCache = DEFAULT_USERS;
+  }
+}
 
 let currentUser = null;
 
@@ -1679,7 +1721,7 @@ function openEditPwd(userId, name) {
   setTimeout(()=>document.getElementById('new-pwd-input').focus(),100);
 }
 
-function savePwd() {
+async function savePwd() {
   const np = document.getElementById('new-pwd-input').value;
   const cp = document.getElementById('confirm-pwd-input').value;
   const err= document.getElementById('pwd-error');
@@ -1687,13 +1729,13 @@ function savePwd() {
   if(np !== cp)     { err.textContent='As senhas não coincidem.'; err.style.display='block'; return; }
   const users = getUsers();
   const idx   = users.findIndex(u=>u.id===editingUserId);
-  if(idx>=0) { users[idx].pwd = np; saveUsers(users); }
+  if(idx>=0) { users[idx].pwd = np; await saveUsers(users); }
   closeModal('modal-pwd');
   renderAdmin();
   showToast('✓ Senha alterada com sucesso!');
 }
 
-function addUser() {
+async function addUser() {
   const login = document.getElementById('new-user-login').value.trim().toLowerCase();
   const name  = document.getElementById('new-user-name').value.trim();
   const pwd   = document.getElementById('new-user-pwd').value;
@@ -1701,8 +1743,9 @@ function addUser() {
   if(!login||!name||pwd.length<4) { alert('Preencha todos os campos. Senha mínima 4 caracteres.'); return; }
   const users = getUsers();
   if(users.find(u=>u.login===login)) { alert('Usuário já existe.'); return; }
-  users.push({id:'u'+Date.now(), login, name, role, pwd});
-  saveUsers(users);
+  const newUser = {id:'u'+Date.now(), login, name, role, pwd, tabs:null};
+  users.push(newUser);
+  await saveUsers(users);
   document.getElementById('new-user-login').value='';
   document.getElementById('new-user-name').value='';
   document.getElementById('new-user-pwd').value='';
@@ -1710,11 +1753,16 @@ function addUser() {
   showToast('✓ Usuário adicionado!');
 }
 
-function deleteUser(id) {
+async function deleteUser(id) {
   if(!confirm('Remover este usuário?')) return;
+  try {
+    await fetch(`${SUPA_URL}/rest/v1/usuarios?id=eq.${encodeURIComponent(id)}`,
+      {method:'DELETE', headers:SUPA_HEADERS});
+  } catch(e) { console.error(e.message); }
   const users = getUsers().filter(u=>u.id!==id);
-  saveUsers(users);
+  _usersCache = users;
   renderAdmin();
+  showToast('✓ Usuário removido!');
 }
 
 // ══ LOGIN SCREEN — profile pills ════════════════════════
@@ -3685,7 +3733,7 @@ function openEditUser(userId) {
   document.getElementById('modal-edit-user').classList.add('open');
 }
 
-function saveEditUser() {
+async function saveEditUser() {
   const users = getUsers();
   const idx   = users.findIndex(u=>u.id===editingUserIdFull);
   if (idx < 0) return;
@@ -3694,14 +3742,12 @@ function saveEditUser() {
   const role  = document.getElementById('edit-user-role').value;
   const tabs  = ALL_TABS_OPTIONS_ADM.filter(t => document.getElementById('edit-tab-'+t.id)?.checked).map(t=>t.id);
   if (!name || !login) { alert('Preencha nome e usuário.'); return; }
-  // Verificar login duplicado
   if (users.some((u,i)=>u.login===login && i!==idx)) { alert('Este usuário já existe.'); return; }
   users[idx] = {...users[idx], name, login, role, tabs};
-  saveUsers(users);
+  await saveUsers(users);
   closeModal('modal-edit-user');
   renderAdmin();
   showToast('✓ Usuário atualizado!');
-  // Se editou o usuário atual, atualizar topbar
   if (currentUser && currentUser.id === editingUserIdFull) {
     currentUser = users[idx];
     localStorage.setItem('arena_session', JSON.stringify(currentUser));
@@ -4786,19 +4832,12 @@ function renderTiradosRelatorio() {
 
 // ══ BOOT ════════════════════════════════════════════════
 // Check session
-(function() {
+(async function() {
   const fmtD = d => d.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
   document.getElementById('topbar-date').textContent = fmtD(new Date()).replace(/^\w/,c=>c.toUpperCase());
+  // Carregar usuários do Supabase
+  await loadUsersFromSupabase();
   buildLoginPills();
-  // Corrigir nome do admin se ainda for "Administrador"
-  try {
-    const users = getUsers();
-    let changed = false;
-    users.forEach(u => {
-      if(u.id==='u1' && u.name==='Administrador') { u.name='Flávia Mota'; changed=true; }
-    });
-    if(changed) saveUsers(users);
-  } catch(e) {}
   const saved = localStorage.getItem('arena_session');
   if(saved) {
     try {
