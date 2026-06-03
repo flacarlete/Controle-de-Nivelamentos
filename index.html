@@ -1799,6 +1799,35 @@ async function supaUpsert(rows, table = 'frequencia') {
   if (!res.ok) throw new Error(await res.text());
 }
 
+
+async function supaInsert(table, row) {
+  const res = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: { ...SUPA_HEADERS, 'Prefer': 'return=representation' },
+    body: JSON.stringify(row)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function supaUpdate(table, id, data) {
+  const res = await fetch(`${SUPA_URL}/rest/v1/${table}?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...SUPA_HEADERS, 'Prefer': 'return=representation' },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function supaDeleteRow(table, id) {
+  const res = await fetch(`${SUPA_URL}/rest/v1/${table}?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: SUPA_HEADERS
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
 async function supaDelete(alunoId, data) {
   const res = await fetch(
     `${SUPA_URL}/rest/v1/frequencia?aluno_id=eq.${encodeURIComponent(alunoId)}&data=eq.${data}`,
