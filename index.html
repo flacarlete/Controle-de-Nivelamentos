@@ -2971,6 +2971,7 @@ let pfActiveTurno = 'Todos';
 let pfActiveTurma = 'Todos';
 let pfOpenCards   = new Set();
 let pfRelSelect   = '__all__';
+let pfRelSelect2  = '__all__';
 
 const pfTodayKey = new Date().toISOString().slice(0,10);
 
@@ -3255,105 +3256,158 @@ function pfRenderHistorico() {
 
 // ─── Relatório ────────────────────────────────────────────
 function pfRenderRelatorio() {
-  const allKeys = Object.keys(pfAllCache).sort();
+  const allKeys = Object.keys(pfAllCache).sort().reverse();
   const sel = document.getElementById('pf-rel-select');
   pfRelSelect = sel.value;
-  document.getElementById('pf-rel-info').textContent = allKeys.length + ' dia' + (allKeys.length!==1?'s':'') + ' registrado' + (allKeys.length!==1?'s':'');
-
-  // Build per-prof stats
-  const stats = {};
-  PROFESSORES.forEach(p => {
-    stats[p.id] = {totalIssues:0, checkCount:{}, dayIssues:{}, noteList:[]};
-    CHECKS.forEach(c=>{ stats[p.id].checkCount[c.id]={label:c.label,count:0}; });
-  });
-  allKeys.forEach(key => {
-    const dd = pfAllCache[key]||{};
-    const dn = pfNotesAll[key]||{};
-    PROFESSORES.forEach(p => {
-      CHECKS.forEach(c => {
-        const k = p.id+'__'+c.id;
-        if (dd[k]==='bad') {
-          stats[p.id].totalIssues++;
-          stats[p.id].checkCount[c.id].count++;
-          if (!stats[p.id].dayIssues[key]) stats[p.id].dayIssues[key]=[];
-          stats[p.id].dayIssues[key].push(c.label);
-          if (dn[k]) stats[p.id].noteList.push({date:key,check:c.label,note:dn[k]});
-        }
-      });
-    });
-  });
+  document.getElementById('pf-rel-info').textContent =
+    allKeys.length + ' dia' + (allKeys.length!==1?'s':'') + ' registrado' + (allKeys.length!==1?'s':'');
 
   const wrap = document.getElementById('pf-relatorio-body');
 
-  if (pfRelSelect==='__all__') {
-    const sorted = [...PROFESSORES].sort((a,b)=>stats[b.id].totalIssues-stats[a.id].totalIssues);
-    let html = '<div class="pf-ov-grid">';
-    sorted.forEach(p => {
-      const rs = stats[p.id];
-      const tc = TURMA_COLOR[p.turma]||{bg:'var(--surface2)',text:'var(--text2)',border:'var(--border2)'};
-      const col = rs.totalIssues===0?'var(--green-text,#27500a)':rs.totalIssues<=3?'var(--amber)':'var(--red)';
-      html += `<div class="pf-ov-card" onclick="document.getElementById('pf-rel-select').value='${p.id}';pfRenderRelatorio()">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <div style="width:28px;height:28px;border-radius:50%;background:${tc.bg};color:${tc.text};border:1px solid ${tc.border};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">${initials(p.nome)}</div>
-          <div style="min-width:0"><div class="pf-ov-name">${p.nome}</div><div class="pf-ov-sub">${p.disciplina} · ${p.turma}</div></div>
-        </div>
-        <div class="pf-ov-issues" style="color:${col}">${rs.totalIssues===0?'✓ Sem problemas':`⚠ ${rs.totalIssues} problema${rs.totalIssues>1?'s':''}`}</div>
-      </div>`;
+  // Visão geral: lista todas as ocorrências em ordem cronológica
+  // Formato: Professor | Data | Problema
+  if (pfRelSelect === '__all__') {
+    // Coletar TODAS as ocorrências de todos os dias
+    const linhas = [];
+    allKeys.forEach(key => {
+      const dd = pfAllCache[key]||{};
+      const dn = pfNotesAll[key]||{};
+      const d = new Date(key+'T12:00:00');
+      const dateStr = d.toLocaleDateString('pt-BR',{day:'numeric',month:'short',year:'numeric'});
+      PROFESSORES.forEach(p => {
+        CHECKS.forEach(c => {
+          if(dd[p.id+'__'+c.id]==='bad') {
+            linhas.push({
+              prof: p.nome,
+              disc: p.disciplina,
+              turma: p.turma,
+              data: key,
+              dateStr,
+              problema: c.label,
+              grupo: c.group,
+              nota: dn[p.id+'__'+c.id]||''
+            });
+          }
+        });
+      });
     });
-    html += '</div>';
-    wrap.innerHTML = html;
+
+    if(!linhas.length) {
+      wrap.innerHTML = `<div class="empty"><span class="e-ico">🎉</span><p>Nenhuma ocorrência registrada.</p></div>`;
+      return;
+    }
+
+    // Filtro por professor
+    const profs = [...new Set(linhas.map(l=>l.prof))].sort();
+    const filtroHtml = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:1.25rem">
+      <span style="font-size:12px;font-weight:500;color:var(--text2)">Filtrar:</span>
+      <select class="form-select" id="pf-rel-prof-filter" style="width:auto;flex:1;max-width:280px" onchange="pfRenderRelatorio()">
+        <option value="__all__">Todos os professores</option>
+        ${profs.map(p=>`<option value="${p}"${pfRelSelect2===p?' selected':''}>${p}</option>`).join('')}
+      </select>
+      <span style="font-size:12px;color:var(--text3)">${linhas.length} ocorrência${linhas.length!==1?'s':''} no total</span>
+    </div>`;
+
+    const linhasFiltradas = pfRelSelect2 && pfRelSelect2!=='__all__'
+      ? linhas.filter(l=>l.prof===pfRelSelect2)
+      : linhas;
+
+    const tabelaHtml = `<div style="background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);overflow:hidden;box-shadow:var(--shadow)">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="background:var(--surface2)">
+            <th style="text-align:left;padding:10px 16px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);white-space:nowrap">Professor</th>
+            <th style="text-align:left;padding:10px 16px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);white-space:nowrap">Disciplina / Turma</th>
+            <th style="text-align:left;padding:10px 16px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);white-space:nowrap">Data</th>
+            <th style="text-align:left;padding:10px 16px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3)">Problema apresentado</th>
+            <th style="text-align:left;padding:10px 16px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3)">Obs.</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${linhasFiltradas.map((l,i)=>`<tr style="border-top:1px solid var(--border);${i%2===1?'background:var(--bg)':''}">
+            <td style="padding:10px 16px;font-size:13px;font-weight:500">${l.prof}</td>
+            <td style="padding:10px 16px;font-size:12px;color:var(--text3)">${l.disc}<br><span style="font-size:11px">${l.turma}</span></td>
+            <td style="padding:10px 16px;font-size:12px;white-space:nowrap;color:var(--text2)">${l.dateStr}</td>
+            <td style="padding:10px 16px">
+              <div style="font-size:13px;color:var(--red)">${l.problema}</div>
+              <div style="font-size:11px;color:var(--text3)">${l.grupo}</div>
+            </td>
+            <td style="padding:10px 16px;font-size:12px;color:var(--amber)">${l.nota||'—'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+
+    wrap.innerHTML = filtroHtml + tabelaHtml;
+
+    // Bind filtro
+    document.getElementById('pf-rel-prof-filter')?.addEventListener('change', function() {
+      pfRelSelect2 = this.value;
+      pfRenderRelatorio();
+    });
     return;
   }
 
+  // Perfil individual de um professor
   const prof = PROFESSORES.find(p=>p.id===pfRelSelect);
   if (!prof) return;
-  const rs = stats[prof.id];
+
+  const ocorrencias = [];
+  allKeys.forEach(key => {
+    const dd = pfAllCache[key]||{};
+    const dn = pfNotesAll[key]||{};
+    const d = new Date(key+'T12:00:00');
+    const dateStr = d.toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+    CHECKS.forEach(c => {
+      if(dd[prof.id+'__'+c.id]==='bad') {
+        ocorrencias.push({dateStr, key, problema:c.label, grupo:c.group, nota:dn[prof.id+'__'+c.id]||''});
+      }
+    });
+  });
+
   const tc = TURMA_COLOR[prof.turma]||{bg:'var(--surface2)',text:'var(--text2)',border:'var(--border2)'};
-  const missCol = rs.totalIssues===0?'var(--green)':rs.totalIssues<=3?'var(--amber)':'var(--red)';
-  const recent = allKeys.slice(-30).reverse();
-  const dots = recent.map(key => {
-    const hasMiss = !!(rs.dayIssues[key]?.length);
-    const lbl = new Date(key+'T12:00:00').getDate();
-    return `<div class="day-dot ${hasMiss?'dd-issue':'dd-ok'}" title="${key}: ${hasMiss?rs.dayIssues[key].join(', '):'sem problemas'}">${lbl}</div>`;
-  }).join('');
-  const checkRows = CHECKS.map(c=>{
-    const cc=rs.checkCount[c.id];
-    return `<div class="item-issue-row">
-      <div><div style="font-size:13px">${cc.label}</div><div style="font-size:11px;color:var(--text3)">${c.group}</div></div>
-      <div style="font-size:13px;font-weight:600;color:${cc.count>0?'var(--red)':'var(--green)'}">${cc.count>0?`⚠ ${cc.count} vez${cc.count>1?'es':''}`:'✓ OK'}</div>
+
+  if(!ocorrencias.length) {
+    wrap.innerHTML = `<div style="background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);padding:2rem;text-align:center">
+      <div style="font-size:36px;margin-bottom:12px">🎉</div>
+      <div style="font-size:15px;font-weight:600;margin-bottom:4px">${prof.nome}</div>
+      <div style="font-size:13px;color:var(--text3)">${prof.disciplina} · ${prof.turma}</div>
+      <div style="margin-top:16px;font-size:14px;color:var(--green);font-weight:500">Nenhuma ocorrência registrada.</div>
     </div>`;
-  }).join('');
-  const notesHtml = rs.noteList.length ? `<div class="inner-section">
-    <div class="inner-title">Observações</div>
-    ${rs.noteList.sort((a,b)=>b.date.localeCompare(a.date)).map(n=>`
-      <div style="border-top:1px solid var(--border);padding:10px 0">
-        <div style="font-size:11px;color:var(--text3);margin-bottom:3px">${new Date(n.date+'T12:00:00').toLocaleDateString('pt-BR',{day:'numeric',month:'long',year:'numeric'})} · ${n.check}</div>
-        <div style="font-size:13px;color:var(--amber)">💬 ${n.note}</div>
-      </div>`).join('')}
-  </div>` : '';
-  wrap.innerHTML = `<div class="prof-profile">
-    <div class="prof-profile-header">
-      <div style="display:flex;align-items:center;gap:14px">
-        <div class="pp-avatar" style="background:${tc.bg};color:${tc.text};border:.5px solid ${tc.border}">${initials(prof.nome)}</div>
-        <div><div class="pp-name">${prof.nome}</div><div class="pp-sub">${prof.disciplina} · ${prof.turma} · ${prof.turno} · ${allKeys.length} dia${allKeys.length!==1?'s':''} analisado${allKeys.length!==1?'s':''}</div></div>
+    return;
+  }
+
+  wrap.innerHTML = `
+    <div style="background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);padding:14px 18px;margin-bottom:1.25rem;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow)">
+      <div style="width:44px;height:44px;border-radius:50%;background:${tc.bg};color:${tc.text};border:1px solid ${tc.border};display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex-shrink:0">${initials(prof.nome)}</div>
+      <div>
+        <div style="font-size:16px;font-weight:600">${prof.nome}</div>
+        <div style="font-size:12px;color:var(--text3)">${prof.disciplina} · ${prof.turma} · ${prof.turno}</div>
       </div>
-      <div class="kpis">
-        <div class="kpi"><div class="kpi-val" style="color:${missCol}">${rs.totalIssues}</div><div class="kpi-label">Problemas</div></div>
-        <div class="kpi"><div class="kpi-val" style="color:var(--amber)">${rs.noteList.length}</div><div class="kpi-label">Com obs.</div></div>
-        <div class="kpi"><div class="kpi-val" style="color:var(--text2)">${Object.keys(rs.dayIssues).length}</div><div class="kpi-label">Dias c/ falha</div></div>
+      <div style="margin-left:auto;text-align:right">
+        <div style="font-size:22px;font-weight:700;color:var(--red)">${ocorrencias.length}</div>
+        <div style="font-size:11px;color:var(--text3)">ocorrência${ocorrencias.length!==1?'s':''}</div>
       </div>
     </div>
-    <div class="inner-section"><div class="inner-title">Por critério</div>${checkRows}</div>
-    <div class="inner-section">
-      <div class="inner-title">Histórico (últimos 30 dias)</div>
-      <div class="day-dots">${dots||'<span style="color:var(--text3);font-size:13px">Sem dados.</span>'}</div>
-      <div class="dot-legend">
-        <span><span class="dot-sq" style="background:var(--green-bg);border:.5px solid var(--accent-mid)"></span>Sem problemas</span>
-        <span><span class="dot-sq" style="background:var(--red-bg);border:.5px solid var(--red)"></span>Problema registrado</span>
-      </div>
-    </div>
-    ${notesHtml}
-  </div>`;
+    <div style="background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);overflow:hidden;box-shadow:var(--shadow)">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:var(--surface2)">
+          <th style="text-align:left;padding:10px 16px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3)">Data</th>
+          <th style="text-align:left;padding:10px 16px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3)">Problema apresentado</th>
+          <th style="text-align:left;padding:10px 16px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3)">Observação</th>
+        </tr></thead>
+        <tbody>
+          ${ocorrencias.map((o,i)=>`<tr style="border-top:1px solid var(--border);${i%2===1?'background:var(--bg)':''}">
+            <td style="padding:10px 16px;font-size:12px;white-space:nowrap;color:var(--text2)">${o.dateStr}</td>
+            <td style="padding:10px 16px">
+              <div style="font-size:13px;color:var(--red);font-weight:500">${o.problema}</div>
+              <div style="font-size:11px;color:var(--text3)">${o.grupo}</div>
+            </td>
+            <td style="padding:10px 16px;font-size:12px;color:var(--amber)">${o.nota||'—'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
 }
 
 
