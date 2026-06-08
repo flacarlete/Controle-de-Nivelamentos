@@ -106,7 +106,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 /* ══ TABS ═══════════════════════════════ */
 .tab-nav{
   background:var(--surface);border-bottom:1px solid var(--border);
-  display:flex;overflow-x:auto;padding:0 1rem;
+  display:flex;overflow-x:auto;padding:0 2rem;
   scrollbar-width:none;
 }
 .tab-nav::-webkit-scrollbar{display:none}
@@ -261,7 +261,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .btn-confirm:hover{background:var(--accent-mid)}
 
 @media(max-width:640px){
-  .container{padding:1rem}
+  .container{padding:1rem 1.25rem}
+  .tab-nav{padding:0 1.25rem}
   .stats-grid{grid-template-columns:repeat(2,1fr)}
   .hist-row{grid-template-columns:1fr 80px}
   .hist-row .h-disc,.hist-row .h-turma{display:none}
