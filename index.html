@@ -1543,6 +1543,8 @@ const TABS_BY_ROLE = {
 };
 // Retorna as abas do usuário (tabs custom ou fallback por role)
 function getUserTabs(user) {
+  // admin e coord sempre têm acesso total (TABS_BY_ROLE), ignorando tabs salvas
+  if (user.role === 'admin' || user.role === 'coord') return TABS_BY_ROLE[user.role];
   if (user.tabs && user.tabs.length > 0) return user.tabs;
   return TABS_BY_ROLE[user.role] || ['chamada'];
 }
